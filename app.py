@@ -32,7 +32,6 @@ class Game:
         return -1
     
     def reset(self):
-        self.p1 = self.p2 = None
         self.turn = -1
         self.moves = 0
         self.board = [[0]*3 for _ in range(3)]
@@ -59,11 +58,20 @@ async def handler(sock):
             GAMES[game_id].p2 = sock
 
             resp = {
-                'type': 'init',
-                'gameId': game_id
+                'type': 'join',
+                'gameId': game_id,
             }
             await sock.send(json.dumps(resp))
         
+        elif event['type'] == 'reset':
+            game_id = event['gameId']
+            game = GAMES[game_id]
+            game.reset()
+            
+            resp = {'type': 'reset'}
+            websockets.broadcast((game.p1, game.p2), json.dumps(resp))
+
+
         elif event['type'] == 'move':
             x, y = event['pos']
             game = GAMES[event['gameId']]

@@ -4,15 +4,17 @@ const TEXT_COLOR = "rgb(30, 30, 30)";
 const WIN_COLOR = "rgba(151, 255, 149, 0.5)"
 
 let gameId=1;
+let thisPlayer;
 
 let startButton = document.querySelector('#init');
 let joinButton = document.querySelector('#join')
 let cells = document.querySelectorAll('.cell');
 let player = document.querySelector('.curr-player');
+let resetButton = document.querySelector('#reset');
 let bg = document.getElementById('bg');
 
 
-function checkRow(pattern) {
+function paintRow(pattern) {
     let i = pattern-1;
     for (let j=0; j<3; j++) {
         let elmt = document.getElementById(`${3*i + j}`);
@@ -21,7 +23,7 @@ function checkRow(pattern) {
     }
 }
 
-function checkCol(pattern) {
+function paintCol(pattern) {
     let i = pattern-4;
     for (let k=0; k<3; k++) {
         let elmt = document.getElementById(`${3*k + i}`);
@@ -30,7 +32,7 @@ function checkCol(pattern) {
     }
 }
 
-function checkDiag(pattern) {      
+function paintDiag(pattern) {      
   if (pattern == 7) {
     for (let k=0; k<3; k++) {
         let elmt = document.getElementById(`${3*k + k}`);
@@ -57,17 +59,41 @@ sock.addEventListener('message', ({ data }) => {
     const {type} = event;
     console.log(event);
     switch (type) {
-        case 'init':
-            gameId = event.gameId; break;
-        case 'join': 
-            gameId = event.gameId; break;
-        case 'move': 
+        case 'init': {
+            gameId = event.gameId;
+            thisPlayer = -1; // X
+            break;
+        }
+        case 'join': {
+            gameId = event.gameId;
+            thisPlayer = 1; // O
+            break;
+        }
+        case 'reset': {
+            for (let i=0; i<9; i++) {
+                cells[i].style.color = TEXT_COLOR;
+                cells[i].innerText = '';
+                cells[i].style.backgroundColor = NOT_SELECTED;
+                cells[i].style.opacity = "1";
+            }
+            enableCellClick();
+            bg.classList.remove('middle');
+            bg.classList.add('up');
+            player.innerText = 'X';
+        }
+        case 'move': {
             const [x, y] = event.pos;
             console.log(event);
-            const [player, CURRENT_COIN] = event.player;
+            const [_, CURRENT_COIN] = event.player;
+            
+            console.log(CURRENT_COIN, thisPlayer);
+            if (CURRENT_COIN != thisPlayer) enableCellClick();
+            else disableCellClick();
+            
             const block = document.getElementById(`${3*x + y}`)
-            block.innerText = CURRENT_COIN > 0 ? 'X' : 'O';
+            block.innerText = CURRENT_COIN < 0 ? 'X' : 'O';
             block.style.backgroundColor = SELECTED;
+            disableCellClick(3*x+y);
             if (CURRENT_COIN > 0) {
                 bg.classList.remove('up');
                 bg.classList.add('down');
@@ -76,22 +102,25 @@ sock.addEventListener('message', ({ data }) => {
                 bg.classList.remove('down');
                 bg.classList.add('up');
             }
-            player.innerText = CURRENT_COIN > 0 ? 'X' : 'O';
+            player.innerText = CURRENT_COIN < 0 ? 'X' : 'O';
             break;
-        case 'win':
+        }
+        case 'win': {
             let pattern = event.pattern;
             const [i, j] = event.pos;
             let blk = document.getElementById(`${3*i + j}`)
-            blk.innerText = CURRENT_COIN > 0 ? 'X' : 'O';
+            const [_, CURRENT_COIN] = event.winner;
+            blk.innerText = CURRENT_COIN < 0 ? 'X' : 'O';
             blk.style.backgroundColor = SELECTED;
-            [player, CURRENT_COIN] = event.winner;
+
+            disableCellClick();
             
             if (pattern >= 1 && pattern <= 3)
-                checkRow(pattern);
+                paintRow(pattern);
             else if (pattern >= 4 && pattern <= 6)
-                checkCol(pattern);
+                paintCol(pattern);
             else
-                checkDiag(pattern);
+                paintDiag(pattern);
             
             if (CURRENT_COIN < 0) {
                 bg.classList.remove('down');
@@ -101,38 +130,65 @@ sock.addEventListener('message', ({ data }) => {
                 bg.classList.remove('up');
                 bg.classList.add('down');
             }
+            
             player.innerText = `${CURRENT_COIN < 0 ? 'X' : 'O'} WINS!`;
             break;
-        case 'tie':
+        }
+        case 'tie': {
             player.innerText = "TIE!";
+            disableCellClick();
             bg.classList.remove('down');
             bg.classList.remove('up');
             bg.classList.add('middle');
             break;
+        }
     }
 });
 
-
-for (let i=0; i<9; i++) {
-    cells[i].onclick = (event) => {
-        let cell = parseInt(event.target.id);
-        const x = Math.floor(cell / 3);
-        const y = cell % 3;
-        
-        sock.send(JSON.stringify({ type: 'move', pos: [x, y], gameId }))    
+function enableCellClick() {
+    for (let i=0; i<9; i++) {
+        cells[i].onclick = (event) => {
+            let cell = parseInt(event.target.id);
+            const x = Math.floor(cell / 3);
+            const y = cell % 3;
+            
+            sock.send(JSON.stringify({ type: 'move', pos: [x, y], gameId }))    
+        }
     }
 }
 
-startButton.onclick = joinButton.onclick = ({ target }) => {
+function disableCellClick(cell = null) {
+    if (cell != null) {
+        cells[cell].onclick = null;
+    } else {
+        for (let i=0; i<9; i++) 
+            cells[i].onclick = null;
+    }
+}
+
+
+function initialise ({ target }) {
     for (let i=0; i<9; i++) {
         cells[i].style.color = TEXT_COLOR;
         cells[i].innerText = '';
         cells[i].style.backgroundColor = NOT_SELECTED;
         cells[i].style.opacity = "1";
     }
+    enableCellClick();
     bg.classList.remove('middle');
     bg.classList.add('up');
     player.innerText = 'X';
     sock.send(JSON.stringify({type: target.id, gameId}))
+};
+
+startButton.onclick = initialise;
+joinButton.onclick = initialise;
+
+resetButton.onclick = () => {
+    resp = {
+        type: 'reset',
+        gameId,
+    }
+    sock.send(JSON.stringify(resp));
 }
 

@@ -1,5 +1,6 @@
 import asyncio
 import json
+import secrets
 
 from websockets import server
 import websockets
@@ -41,8 +42,9 @@ async def handler(sock):
     async for msg in sock:
         event = json.loads(msg)
         print(event)
+
         if event['type'] == 'init':
-            new_game_id = 1
+            new_game_id = secrets.token_urlsafe(8)
             new_game = Game()
             new_game.p1 = sock
             GAMES[new_game_id] = new_game
@@ -70,7 +72,6 @@ async def handler(sock):
             
             resp = {'type': 'reset'}
             websockets.broadcast((game.p1, game.p2), json.dumps(resp))
-
 
         elif event['type'] == 'move':
             x, y = event['pos']

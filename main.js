@@ -3,7 +3,7 @@ const SELECTED = "rgba(255, 255, 255, 0.8)";
 const TEXT_COLOR = "rgb(30, 30, 30)";
 const WIN_COLOR = "rgba(151, 255, 149, 0.5)"
 
-let gameId=1;
+let gameId;
 let thisPlayer;
 
 let startButton = document.querySelector('#init');
@@ -11,6 +11,7 @@ let joinButton = document.querySelector('#join')
 let cells = document.querySelectorAll('.cell');
 let player = document.querySelector('.curr-player');
 let resetButton = document.querySelector('#reset');
+let gameIdInput = document.querySelector('#gameid')
 let bg = document.getElementById('bg');
 
 
@@ -58,29 +59,26 @@ sock.addEventListener('message', ({ data }) => {
     const event = JSON.parse(data);
     const {type} = event;
     console.log(event);
+
     switch (type) {
+
         case 'init': {
             gameId = event.gameId;
             thisPlayer = -1; // X
+            alert(`Your Game Id is: ${gameId}. Share this to the second player`);
             break;
         }
+
         case 'join': {
             gameId = event.gameId;
             thisPlayer = 1; // O
             break;
         }
+
         case 'reset': {
-            for (let i=0; i<9; i++) {
-                cells[i].style.color = TEXT_COLOR;
-                cells[i].innerText = '';
-                cells[i].style.backgroundColor = NOT_SELECTED;
-                cells[i].style.opacity = "1";
-            }
-            enableCellClick();
-            bg.classList.remove('middle');
-            bg.classList.add('up');
-            player.innerText = 'X';
+            reset();
         }
+
         case 'move': {
             const [x, y] = event.pos;
             console.log(event);
@@ -102,9 +100,10 @@ sock.addEventListener('message', ({ data }) => {
                 bg.classList.remove('down');
                 bg.classList.add('up');
             }
-            player.innerText = CURRENT_COIN < 0 ? 'X' : 'O';
+            player.innerText = CURRENT_COIN > 0 ? 'X' : 'O';
             break;
         }
+
         case 'win': {
             let pattern = event.pattern;
             const [i, j] = event.pos;
@@ -134,6 +133,7 @@ sock.addEventListener('message', ({ data }) => {
             player.innerText = `${CURRENT_COIN < 0 ? 'X' : 'O'} WINS!`;
             break;
         }
+
         case 'tie': {
             player.innerText = "TIE!";
             disableCellClick();
@@ -166,8 +166,7 @@ function disableCellClick(cell = null) {
     }
 }
 
-
-function initialise ({ target }) {
+function reset() {
     for (let i=0; i<9; i++) {
         cells[i].style.color = TEXT_COLOR;
         cells[i].innerText = '';
@@ -178,11 +177,18 @@ function initialise ({ target }) {
     bg.classList.remove('middle');
     bg.classList.add('up');
     player.innerText = 'X';
-    sock.send(JSON.stringify({type: target.id, gameId}))
+}
+
+startButton.onclick = () => {
+    reset();
+    sock.send(JSON.stringify({type: "init"}))
 };
 
-startButton.onclick = initialise;
-joinButton.onclick = initialise;
+joinButton.onclick = () => {
+    reset();
+    sock.send(JSON.stringify({type: "join", gameId: gameIdInput.value}))
+    gameIdInput.value = "";
+};
 
 resetButton.onclick = () => {
     resp = {

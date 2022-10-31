@@ -65,7 +65,7 @@ sock.addEventListener('message', ({ data }) => {
         case 'init': {
             gameId = event.gameId;
             thisPlayer = -1; // X
-            alert(`Your Game Id is: ${gameId}. Share this to the second player`);
+            alert(`Your Game Id is: ${gameId}, share this to the second player`);
             break;
         }
 
@@ -75,8 +75,20 @@ sock.addEventListener('message', ({ data }) => {
             break;
         }
 
+        case 'opjoined': {
+            reset();
+            break;
+        }
+
         case 'reset': {
             reset();
+            break;
+        }
+
+        case 'end': {
+            completeReset();
+            alert("Opponent Left");
+            break;
         }
 
         case 'move': {
@@ -145,6 +157,9 @@ sock.addEventListener('message', ({ data }) => {
     }
 });
 
+
+
+
 function enableCellClick() {
     for (let i=0; i<9; i++) {
         cells[i].onclick = (event) => {
@@ -179,8 +194,18 @@ function reset() {
     player.innerText = 'X';
 }
 
+function completeReset() {
+    for (let i=0; i<9; i++) {
+        cells[i].style.opacity = "0";
+    }
+    disableCellClick();
+    bg.classList.remove('up');
+    bg.classList.remove('down');
+    bg.classList.add('middle');
+    player.innerText = "X/O";
+}
+
 startButton.onclick = () => {
-    reset();
     sock.send(JSON.stringify({type: "init"}))
 };
 

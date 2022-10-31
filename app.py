@@ -3,6 +3,7 @@ import json
 import secrets
 
 from websockets import server
+from websockets.exceptions import ConnectionClosed
 import websockets
 
 GAMES = dict()
@@ -39,6 +40,7 @@ class Game:
         
 
 async def handler(sock):
+    GAME_ID = 0
     async for msg in sock:
         event = json.loads(msg)
         print(event)
@@ -47,6 +49,7 @@ async def handler(sock):
             new_game_id = secrets.token_urlsafe(8)
             new_game = Game()
             new_game.p1 = sock
+            GAME_ID = new_game_id
             GAMES[new_game_id] = new_game
 
             resp = {
@@ -56,7 +59,7 @@ async def handler(sock):
             await sock.send(json.dumps(resp))
 
         elif event['type'] == 'join':
-            game_id = event['gameId']
+            GAME_ID = game_id = event['gameId']
             GAMES[game_id].p2 = sock
 
             resp = {
@@ -64,6 +67,8 @@ async def handler(sock):
                 'gameId': game_id,
             }
             await sock.send(json.dumps(resp))
+            resp_to_p1 = json.dumps({'type': 'opjoined'})
+            await GAMES[game_id].p1.send(resp_to_p1)
         
         elif event['type'] == 'reset':
             game_id = event['gameId']
@@ -89,6 +94,16 @@ async def handler(sock):
             game.moves += 1
 
             websockets.broadcast((game.p1, game.p2), json.dumps(resp))
+
+    try:
+        endgame = GAMES[GAME_ID]
+    except KeyError:
+        print("Game removed earlier")
+    else:
+        resp = { 'type': 'end' }
+        other = endgame.p1 if endgame.p2 is sock else endgame.p2
+        await other.send(json.dumps(resp))
+        GAMES.pop(GAME_ID)
 
 
 async def main():
